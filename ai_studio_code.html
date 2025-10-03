@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATC Approach Trainer</title>
+    <style>
+        /* Add the CSS provided above here */
+        body {
+            background-color: #333;
+            color: white;
+            font-family: sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        #atc-map {
+            border: 1px solid #666;
+            background-color: #222;
+            /* IMPORTANT: Adjust width/height to match your SVG viewBox or desired display size */
+            width: 1000px;
+            height: 600px;
+        }
+        .aircraft rect {
+            fill: white;
+            stroke: black;
+        }
+        .aircraft text {
+            fill: white;
+            font-family: monospace;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>ATC Approach Trainer</h1>
+    <div id="controls">
+        <label for="numAircraftInput">Number of Aircraft:</label>
+        <input type="number" id="numAircraftInput" value="10" min="1" max="50">
+        <button id="spawnButton">Respawn Aircraft</button>
+    </div>
+    <div id="atc-container">
+        <!-- Your SVG content will go here.
+             It's best if your SVG has a main <svg> tag with an ID, e.g., id="atc-map"
+             and a group for your radial lines, e.g., <g id="radialsGroup">
+        -->
+        <svg id="atc-map" viewBox="0 0 1000 600" width="1000" height="600">
+            <!-- Placeholder for your actual SVG content.
+                 Make sure it contains an object labeled 'radials' within a group
+                 like <g id="radialsGroup"> and the lines/paths within it. -->
+            <rect x="0" y="0" width="1000" height="600" fill="#222"/>
+            <!-- Airfield Center (for visualization, replace with your actual airfield drawing) -->
+            <circle cx="500" cy="300" r="10" fill="red"/>
+            <text x="500" y="325" fill="white" text-anchor="middle">Airfield</text>
+
+            <!-- Example Radial Group (you'll replace this with your actual SVG data) -->
+            <g id="radialsGroup" stroke="blue" stroke-width="1" opacity="0.5">
+                <line x1="500" y1="300" x2="100" y2="100"/>
+                <line x1="500" y1="300" x2="900" y2="100"/>
+                <line x1="500" y1="300" x2="100" y2="500"/>
+                <line x1="500" y1="300" x2="900" y2="500"/>
+                <line x1="500" y1="300" x2="500" y2="50"/>
+                <line x1="500" y1="300" x2="500" y2="550"/>
+            </g>
+
+        </svg>
+    </div>
+
+    <script>
+        // Paste the JavaScript code from above here
+        // Ensure the script is *after* your SVG element.
+
+        // --- Configuration ---
+        const AIRFIELD_CENTER_X = 500; // IMPORTANT: Adjust these to your airfield's true center in your SVG
+        const AIRFIELD_CENTER_Y = 300; // based on your SVG coordinates.
+        const SPAWN_DISTANCE = 250; // How far out from the airfield aircraft spawn
+        const AIRCRAFT_SIZE = 10;   // Size of the square dot
+        const LABEL_OFFSET_X = 15; // Offset for the label from the aircraft dot
+
+        // ... (rest of the JavaScript code) ...
+
+        // --- Initial Setup (Call this when the DOM and SVG are ready) ---
+        function initATCApp() {
+            // Parse radials: Find your "radials" layer/group in the SVG and get its paths
+            const radialsGroup = document.getElementById('radialsGroup');
+            if (radialsGroup) {
+                radialsData = Array.from(radialsGroup.querySelectorAll('path, line')); // Can be paths or lines
+            }
+
+            // Example: Spawn 10 aircraft
+            spawnAircraft(parseInt(document.getElementById('numAircraftInput').value || 10));
+
+            // Add event listener to the spawn button
+            document.getElementById('spawnButton').onclick = () => {
+                document.getElementById('atc-map').querySelectorAll('.aircraft').forEach(el => el.remove()); // Clear existing aircraft
+                spawnAircraft(parseInt(document.getElementById('numAircraftInput').value || 10));
+            };
+        }
+
+        // Call init when the document is fully loaded
+        document.addEventListener('DOMContentLoaded', initATCApp);
+    </script>
+</body>
+</html>
