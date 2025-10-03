@@ -384,6 +384,13 @@
     const MAX_SPAWN_DISTANCE = 600;
     const AIRCRAFT_SIZE = 10;
     const LABEL_OFFSET_X = 15;
+    // Preferred radials in degrees (real aviation headings)
+const PREFERRED_RADIALS = [8, 30, 50, 85, 122, 131, 149, 206, 253, 262];
+
+// Converts aviation heading (0° = North, clockwise) to SVG angle (0° = East, clockwise)
+function headingToSvgAngle(realHeading) {
+    return (90 - realHeading + 360) % 360;
+}
 
     // For velocity leader lines
     // 1 NM = 1852 meters, but SVG units are pixels (assume 1 px = 1 m for simplicity, adjust as needed)
@@ -450,76 +457,80 @@
 
     // --- Make labels always upright (not rotated) ---
     function drawAircraft(aircraft) {
-        const svg = document.getElementById('atc-map');
+    const svg = document.getElementById('atc-map');
 
-        // Aircraft group: only symbol rotates, label stays readable
-        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        g.setAttribute('id', aircraft.id);
-        g.setAttribute('class', 'aircraft');
-        g.setAttribute('transform', `translate(${aircraft.x}, ${aircraft.y})`);
+    // Aircraft group: positioned at aircraft (x, y)
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.setAttribute('id', aircraft.id);
+    g.setAttribute('class', 'aircraft');
+    g.setAttribute('transform', `translate(${aircraft.x}, ${aircraft.y})`);
 
-        // Subgroup for symbol, rotated to heading
-        const symbolGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        symbolGroup.setAttribute('transform', `rotate(${aircraft.heading})`);
+    // Symbol (rotated to heading)
+    const symbolGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    symbolGroup.setAttribute('transform', `rotate(${aircraft.heading})`);
 
-        // The square dot (aircraft symbol)
-        const dot = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        dot.setAttribute('x', -AIRCRAFT_SIZE / 2);
-        dot.setAttribute('y', -AIRCRAFT_SIZE / 2);
-        dot.setAttribute('width', AIRCRAFT_SIZE);
-        dot.setAttribute('height', AIRCRAFT_SIZE);
-        dot.setAttribute('fill', 'white');
-        dot.setAttribute('stroke', 'black');
-        dot.setAttribute('stroke-width', '1');
+    // Aircraft dot
+    const dot = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    dot.setAttribute('x', -AIRCRAFT_SIZE / 2);
+    dot.setAttribute('y', -AIRCRAFT_SIZE / 2);
+    dot.setAttribute('width', AIRCRAFT_SIZE);
+    dot.setAttribute('height', AIRCRAFT_SIZE);
+    dot.setAttribute('fill', 'white');
+    dot.setAttribute('stroke', 'black');
+    dot.setAttribute('stroke-width', '1');
+    symbolGroup.appendChild(dot);
 
-        symbolGroup.appendChild(dot);
+    // Add symbol group to main group
+    g.appendChild(symbolGroup);
 
-        // --- Leader Line ---
-        // Compute leader line endpoint (1 min flying time)
-        const speed = aircraft.speed; // knots
-        const heading = aircraft.heading;
-        // Convert heading to radians (SVG 0° is along +X so rotate by -90)
-        const rad = (heading) * Math.PI / 180;
-        const leaderLength = knotsToPixels(speed);
-        const x2 = Math.cos(rad) * leaderLength;
-        const y2 = Math.sin(rad) * leaderLength;
+    // --- Leader Line: OUTSIDE the rotated symbolGroup ---
+    const speed = aircraft.speed;
+    const leaderLength = knotsToPixels(speed);
 
-        const leaderLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        leaderLine.setAttribute('class', 'leader-line');
-        leaderLine.setAttribute('x1', '0');
-        leaderLine.setAttribute('y1', '0');
-        leaderLine.setAttribute('x2', x2.toFixed(1));
-        leaderLine.setAttribute('y2', y2.toFixed(1));
+    // Calculate angle to airfield
+    const dx = AIRFIELD_CENTER_X - aircraft.x;
+    const dy = AIRFIELD_CENTER_Y - aircraft.y;
+    const angleRad = Math.atan2(dy, dx);
 
-        symbolGroup.appendChild(leaderLine);
+    const x2 = Math.cos(angleRad) * leaderLength;
+    const y2 = Math.sin(angleRad) * leaderLength;
 
-        // Text label group (ALWAYS upright/readable)
-        const textGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-        textGroup.setAttribute('transform', `translate(${LABEL_OFFSET_X}, 0)`);
+    const leaderLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    leaderLine.setAttribute('class', 'leader-line');
+    leaderLine.setAttribute('x1', '0');
+    leaderLine.setAttribute('y1', '0');
+    leaderLine.setAttribute('x2', x2.toFixed(1));
+    leaderLine.setAttribute('y2', y2.toFixed(1));
 
-        const callsignText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        callsignText.setAttribute('x', 0);
-        callsignText.setAttribute('y', -5);
-        callsignText.setAttribute('font-size', '10px');
-        callsignText.setAttribute('fill', 'white');
-        callsignText.textContent = aircraft.callsign;
+    // Add leader line to main group, NOT symbolGroup
+    g.appendChild(leaderLine);
 
-        const infoText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        infoText.setAttribute('x', 0);
-        infoText.setAttribute('y', 5);
-        infoText.setAttribute('font-size', '10px');
-        infoText.setAttribute('fill', 'white');
-        infoText.textContent = `${aircraft.getDisplayLevel()} ${aircraft.getDisplaySpeed()}`;
+    // --- Labels ---
+    const textGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    textGroup.setAttribute('transform', `translate(${LABEL_OFFSET_X}, 0)`);
 
-        textGroup.appendChild(callsignText);
-        textGroup.appendChild(infoText);
+    const callsignText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    callsignText.setAttribute('x', 0);
+    callsignText.setAttribute('y', -5);
+    callsignText.setAttribute('font-size', '10px');
+    callsignText.setAttribute('fill', 'white');
+    callsignText.textContent = aircraft.callsign;
 
-        g.appendChild(symbolGroup);
-        g.appendChild(textGroup);
+    const infoText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    infoText.setAttribute('x', 0);
+    infoText.setAttribute('y', 5);
+    infoText.setAttribute('font-size', '10px');
+    infoText.setAttribute('fill', 'white');
+    infoText.textContent = `${aircraft.getDisplayLevel()} ${aircraft.getDisplaySpeed()}`;
 
-        svg.appendChild(g);
-        aircraft.svgElement = g;
-    }
+    textGroup.appendChild(callsignText);
+    textGroup.appendChild(infoText);
+
+    g.appendChild(textGroup);
+
+    svg.appendChild(g);
+    aircraft.svgElement = g;
+}
 
     function spawnAircraft(numAircraft) {
         // Remove existing aircraft from SVG
@@ -543,7 +554,20 @@
                 } else if (radial.tagName === 'path') {
                     x1 = AIRFIELD_CENTER_X;
                     y1 = AIRFIELD_CENTER_Y;
-                    spawnAngle = Math.random() * Math.PI * 2;
+                    let usePreferredRadial = Math.random() < 0.8; // 80% preferred, 20% random
+
+let spawnAngleRad;
+if (usePreferredRadial && PREFERRED_RADIALS.length > 0) {
+    // Pick a preferred radial and convert to SVG angle
+    const realHeading = PREFERRED_RADIALS[Math.floor(Math.random() * PREFERRED_RADIALS.length)];
+    const svgAngleDeg = headingToSvgAngle(realHeading);
+    spawnAngleRad = svgAngleDeg * Math.PI / 180;
+} else {
+    // Random angle (SVG style)
+    spawnAngleRad = Math.random() * Math.PI * 2;
+}
+x = AIRFIELD_CENTER_X + Math.cos(spawnAngleRad) * dist;
+y = AIRFIELD_CENTER_Y + Math.sin(spawnAngleRad) * dist;
                     x2 = x1 + Math.cos(spawnAngle) * dist;
                     y2 = y1 + Math.sin(spawnAngle) * dist;
                 } else {
